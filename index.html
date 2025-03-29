@@ -3,671 +3,420 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner de Texte avec OCR</title>
+    <title>Scanner de Document</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <style>
-        body {
-            text-align: center;
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
             font-family: Arial, sans-serif;
-            background-color: #f4f4f4;
-            padding: 20px;
-            max-width: 800px;
-            margin: 0 auto;
-        }
-        h2 {
-            color: #333;
-        }
-        video, canvas, #preview {
-            display: block;
-            margin: 10px auto;
-            border: 2px solid black;
-            width: 100%; /* Responsive */
-            max-width: 400px; /* Limite la taille sur les grands écrans */
-            height: auto;
-            object-fit: cover;
-        }
-        canvas {
-            display: none;
-        }
-        #previewContainer {
-            position: relative;
-            margin: 10px auto;
-            width: 100%; /* Responsive */
-            max-width: 400px; /* Limite la taille sur les grands écrans */
-            height: auto;
-            display: none;
-        }
-        #cropArea {
-            position: absolute;
-            border: 2px dashed red;
-            background-color: rgba(255, 255, 255, 0.2);
-            cursor: move;
-            display: none;
-        }
-        .resizer {
-            width: 10px;
-            height: 10px;
-            background-color: red;
-            position: absolute;
-            border-radius: 50%;
-        }
-        .resizer.top-left {
-            top: -5px;
-            left: -5px;
-            cursor: nwse-resize;
-        }
-        .resizer.top-right {
-            top: -5px;
-            right: -5px;
-            cursor: nesw-resize;
-        }
-        .resizer.bottom-left {
-            bottom: -5px;
-            left: -5px;
-            cursor: nesw-resize;
-        }
-        .resizer.bottom-right {
-            bottom: -5px;
-            right: -5px;
-            cursor: nwse-resize;
-        }
-        button {
-            padding: 8px 16px;
-            font-size: 14px;
-            cursor: pointer;
-            background-color: #007bff;
-            color: white;
-            border: none;
-            margin: 5px;
-            border-radius: 4px;
-        }
-        button:hover {
-            background-color: #0056b3;
-        }
-        #textOutput {
-            margin-top: 20px;
-            padding: 10px;
-            border: 1px solid #ccc;
-            background-color: white;
-            min-height: 50px;
-            text-align: left;
-            max-height: 300px;
-            overflow-y: auto;
-        }
-        .controls {
-            margin: 15px 0;
-        }
-        .step {
-            display: none;
-        }
-        .active {
-            display: block;
         }
         
-        #qualitySettings {
-            margin: 10px 0;
-            padding: 10px;
-            background-color: #eee;
-            border-radius: 4px;
+        body {
+            max-width: 100%;
+            overflow-x: hidden;
+            background-color: #f5f5f5;
         }
+        
+        .container {
+            max-width: 600px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        
+        h1 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #333;
+            font-size: 24px;
+        }
+        
+        .capture-container {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            margin-bottom: 20px;
+        }
+        
+        #video {
+            width: 100%;
+            max-width: 500px;
+            height: auto;
+            background-color: #000;
+            margin-bottom: 10px;
+            display: none;
+        }
+        
+        #canvas {
+            display: none;
+        }
+        
+        .img-container {
+            width: 100%;
+            max-width: 500px;
+            margin-bottom: 15px;
+            display: none;
+        }
+        
+        #captured-image {
+            width: 100%;
+            max-height: 400px;
+            object-fit: contain;
+        }
+        
+        .button-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 10px;
+            justify-content: center;
+            margin-bottom: 20px;
+        }
+        
+        button {
+            padding: 10px 15px;
+            background-color: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+            font-size: 16px;
+            transition: background-color 0.3s;
+        }
+        
+        button:hover {
+            background-color: #45a049;
+        }
+        
+        button:disabled {
+            background-color: #cccccc;
+            cursor: not-allowed;
+        }
+        
+        #result-container {
+            margin-top: 20px;
+            padding: 15px;
+            background-color: white;
+            border-radius: 5px;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+            max-height: 300px;
+            overflow-y: auto;
+            display: none;
+        }
+        
+        #result-text {
+            white-space: pre-wrap;
+            font-size: 16px;
+            line-height: 1.4;
+        }
+        
+        .cropper-container {
+            margin: 0 auto;
+            max-width: 500px;
+        }
+        
+        .loading {
+            text-align: center;
+            margin: 20px 0;
+            display: none;
+        }
+        
+        .loading p {
+            margin-top: 10px;
+            color: #666;
+        }
+        
         @media (max-width: 768px) {
-    button {
-        padding: 12px 20px;
-        font-size: 16px;
-        margin: 8px;
-    }
-    
-    .resizer {
-        width: 14px;
-        height: 14px;
-    }
-}
+            .container {
+                padding: 10px;
+            }
+            
+            button {
+                padding: 8px 12px;
+                font-size: 14px;
+            }
+        }
     </style>
 </head>
 <body>
-    <h2>Scanner de Texte avec OCR</h2>
-    
-    <div id="step1" class="step active">
-        <video id="video" autoplay playsinline></video>
-        <div class="controls">
-            <button id="switchCamera">Changer de caméra</button>
-            <button id="capture">Prendre une photo</button>
-        </div>
-    </div>
-    
-    <div id="step2" class="step">
-        <div id="previewContainer">
-            <img id="preview" src="" alt="Aperçu de la photo">
-            <div id="cropArea">
-                <div class="resizer top-left"></div>
-                <div class="resizer top-right"></div>
-                <div class="resizer bottom-left"></div>
-                <div class="resizer bottom-right"></div>
+    <div class="container">
+        <h1>Scanner de Document</h1>
+        
+        <div class="capture-container">
+            <video id="video" autoplay playsinline></video>
+            <canvas id="canvas"></canvas>
+            
+            <div class="img-container">
+                <img id="captured-image" alt="Image capturée">
+            </div>
+            
+            <div class="button-group">
+                <button id="start-camera">Activer la caméra</button>
+                <button id="take-photo" disabled>Prendre la photo</button>
+                <button id="crop-btn" disabled>Rogner</button>
+                <button id="scan-btn" disabled>Extraire le texte</button>
+                <button id="save-btn" disabled>Sauvegarder</button>
+                <button id="reset-btn">Recommencer</button>
             </div>
         </div>
-        <div id="qualitySettings">
-            <label for="textSize">Sensibilité au texte : </label>
-            <select id="textSize">
-                <option value="normal">Normal (texte moyen)</option>
-                <option value="small">Haute (petites écritures)</option>
-                <option value="large">Basse (grandes écritures uniquement)</option>
-            </select>
+        
+        <div class="loading">
+            <p>Extraction du texte en cours...</p>
         </div>
-        <div class="controls">
-            <button id="crop">Rogner et analyser</button>
-            <button id="retake">Reprendre une photo</button>
+        
+        <div id="result-container">
+            <h3>Texte extrait:</h3>
+            <pre id="result-text"></pre>
         </div>
     </div>
-    
-    <div id="step3" class="step">
-        <h3>Résultat de l'analyse</h3>
-        <div id="textOutput">En attente d'analyse...</div>
-        <div class="controls">
-            <button id="save">Sauvegarder le texte</button>
-            <button id="restart">Recommencer</button>
-        </div>
-    </div>
-
-    <canvas id="canvas"></canvas>
-    <canvas id="croppedCanvas"></canvas>
-
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.0.2/tesseract.min.js"></script>
 
     <script>
-        window.addEventListener('resize', adjustPreviewContainer);
-window.addEventListener('orientationchange', function() {
-    setTimeout(adjustPreviewContainer, 300);
-});
-        // Éléments HTML
+        // Éléments DOM
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
-        const croppedCanvas = document.getElementById('croppedCanvas');
-        const croppedCtx = croppedCanvas.getContext('2d');
-        const captureButton = document.getElementById('capture');
-        const cropButton = document.getElementById('crop');
-        const retakeButton = document.getElementById('retake');
-        const restartButton = document.getElementById('restart');
-        const switchCameraButton = document.getElementById('switchCamera');
-        const textOutput = document.getElementById('textOutput');
-        const preview = document.getElementById('preview');
-        const cropArea = document.getElementById('cropArea');
-        const previewContainer = document.getElementById('previewContainer');
-        const textSizeSelect = document.getElementById('textSize');
-        const saveButton = document.getElementById('save');
+        const capturedImage = document.getElementById('captured-image');
+        const imgContainer = document.querySelector('.img-container');
+        const resultContainer = document.getElementById('result-container');
+        const resultText = document.getElementById('result-text');
+        const loadingDiv = document.querySelector('.loading');
         
-        // Étapes de l'interface
-        const step1 = document.getElementById('step1');
-        const step2 = document.getElementById('step2');
-        const step3 = document.getElementById('step3');
+        // Boutons
+        const startCameraBtn = document.getElementById('start-camera');
+        const takePhotoBtn = document.getElementById('take-photo');
+        const cropBtn = document.getElementById('crop-btn');
+        const scanBtn = document.getElementById('scan-btn');
+        const saveBtn = document.getElementById('save-btn');
+        const resetBtn = document.getElementById('reset-btn');
         
-        
-        // Dimensions et position du rectangle de rognage
-        let cropX = 50;
-        let cropY = 50;
-        let cropWidth = 300;
-        let cropHeight = 200;
-        let isDragging = false;
-        let isResizing = false;
-        let dragStartX, dragStartY;
-        let currentResizer = null;
-        
-        // Variables pour la caméra
+        // Variables globales
         let stream = null;
-        let facingMode = "environment"; // Par défaut, caméra arrière
+        let cropper = null;
+        let extractedText = '';
         
-        // Activation de la webcam
-        function startCamera() {
-            // Arrêter tout stream existant
-            if (stream) {
-                stream.getTracks().forEach(track => track.stop());
-            }
-            
-            // Configurer contraintes pour la caméra
-            const constraints = {
-                video: {
-                    facingMode: facingMode
-                }
-            };
-            
-            // Démarrer la caméra avec les contraintes
-            navigator.mediaDevices.getUserMedia(constraints)
-                .then(streamObj => {
-                    stream = streamObj;
-                    video.srcObject = stream;
-                })
-                .catch(err => {
-                    console.error("Erreur d'accès à la caméra:", err);
-                    
-                    // Essayer la caméra frontale si la caméra arrière échoue
-                    if (facingMode === "environment") {
-                        facingMode = "user";
-                        startCamera();
-                    } else {
-                        textOutput.textContent = "Erreur d'accès à la caméra.";
+        // Démarrer la caméra
+        startCameraBtn.addEventListener('click', async () => {
+            try {
+                // Utiliser la caméra arrière sur mobile
+                const constraints = {
+                    video: {
+                        facingMode: { ideal: 'environment' },
+                        width: { ideal: 1920 },
+                        height: { ideal: 1080 }
                     }
-                });
-        }
-        
-        // Changer de caméra (avant/arrière)
-        switchCameraButton.addEventListener('click', () => {
-            facingMode = facingMode === "user" ? "environment" : "user";
-            startCamera();
+                };
+                
+                stream = await navigator.mediaDevices.getUserMedia(constraints);
+                video.srcObject = stream;
+                video.style.display = 'block';
+                takePhotoBtn.disabled = false;
+                startCameraBtn.disabled = true;
+            } catch (err) {
+                console.error('Erreur d\'accès à la caméra:', err);
+                alert('Erreur d\'accès à la caméra. Vérifiez que vous avez autorisé l\'accès.');
+            }
         });
         
-        // Démarrer la caméra au chargement de la page
-        startCamera();
-
-        // Fonction pour changer d'étape
-        function showStep(step) {
-            step1.classList.remove('active');
-            step2.classList.remove('active');
-            step3.classList.remove('active');
-            step.classList.add('active');
-            
-            // Redimensionner le conteneur de prévisualisation après avoir rendu l'étape visible
-            if (step === step2) {
-                setTimeout(adjustPreviewContainer, 100);
-            }
-        }
-        
-        // Ajuster la taille du conteneur de prévisualisation
-        function adjustPreviewContainer() {
-            if (preview.complete) {
-                previewContainer.style.height = preview.offsetHeight + 'px';
-            } else {
-                preview.onload = () => {
-                    previewContainer.style.height = preview.offsetHeight + 'px';
-                };
-            }
-        }
-
-        // Fonction pour capturer l'image
-        captureButton.addEventListener('click', () => {
+        // Prendre une photo
+        takePhotoBtn.addEventListener('click', () => {
+            const context = canvas.getContext('2d');
+            // Ajuster les dimensions du canvas à celles de la vidéo
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            preview.src = canvas.toDataURL('image/png');
-            previewContainer.style.display = 'block';
-            cropArea.style.display = 'block';
+            // Dessiner l'image de la vidéo sur le canvas
+            context.drawImage(video, 0, 0, canvas.width, canvas.height);
             
-            // Position initiale du rectangle de rognage
-            const previewWidth = preview.offsetWidth;
-            const previewHeight = preview.offsetHeight;
+            // Convertir le canvas en URL de données
+            const imageDataURL = canvas.toDataURL('image/png');
             
-            cropX = previewWidth * 0.1;
-            cropY = previewHeight * 0.1;
-            cropWidth = previewWidth * 0.8;
-            cropHeight = previewHeight * 0.8;
-            updateCropArea();
+            // Afficher l'image capturée
+            capturedImage.src = imageDataURL;
+            imgContainer.style.display = 'block';
             
-            showStep(step2);
-        });
-        
-        // Mise à jour de la position du rectangle de rognage
-        function updateCropArea() {
-            cropArea.style.left = cropX + 'px';
-            cropArea.style.top = cropY + 'px';
-            cropArea.style.width = cropWidth + 'px';
-            cropArea.style.height = cropHeight + 'px';
-        }
-        
-        // Initialisation des poignées de redimensionnement
-        const resizers = cropArea.querySelectorAll('.resizer');
-        
-        // Gestion du déplacement du rectangle de rognage
-        cropArea.addEventListener('mousedown', (e) => {
-            if (e.target === cropArea) {
-                isDragging = true;
-                dragStartX = e.clientX - cropArea.getBoundingClientRect().left;
-                dragStartY = e.clientY - cropArea.getBoundingClientRect().top;
-                e.preventDefault();
+            // Arrêter la vidéo
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.style.display = 'none';
             }
-        });
-        
-        // Gestion des poignées de redimensionnement
-        resizers.forEach(resizer => {
-            resizer.addEventListener('mousedown', (e) => {
-                isResizing = true;
-                currentResizer = e.target;
-                e.stopPropagation();
-                e.preventDefault();
-            });
             
-            resizer.addEventListener('touchstart', (e) => {
-                isResizing = true;
-                currentResizer = e.target;
-                e.stopPropagation();
+            // Activer les boutons appropriés
+            takePhotoBtn.disabled = true;
+            cropBtn.disabled = false;
+            scanBtn.disabled = false;
+            
+            // Initialiser le cropper
+            if (cropper) {
+                cropper.destroy();
+            }
+            
+            cropper = new Cropper(capturedImage, {
+                viewMode: 1,
+                dragMode: 'move',
+                aspectRatio: NaN,
+                autoCropArea: 0.8,
+                restore: false,
+                guides: true,
+                center: true,
+                highlight: true,
+                cropBoxMovable: true,
+                cropBoxResizable: true,
+                toggleDragModeOnDblclick: true,
             });
         });
         
-        document.addEventListener('mousemove', (e) => {
-            if (isDragging) {
-                // Déplacer le rectangle de rognage
-                const containerRect = previewContainer.getBoundingClientRect();
-                let newX = e.clientX - containerRect.left - dragStartX;
-                let newY = e.clientY - containerRect.top - dragStartY;
-                
-                // Limites pour ne pas sortir de l'image
-                newX = Math.max(0, Math.min(newX, containerRect.width - cropWidth));
-                newY = Math.max(0, Math.min(newY, containerRect.height - cropHeight));
-                
-                cropX = newX;
-                cropY = newY;
-                updateCropArea();
-            } else if (isResizing) {
-                // Redimensionner le rectangle de rognage
-                const containerRect = previewContainer.getBoundingClientRect();
-                
-                if (currentResizer.classList.contains('top-left')) {
-                    // Redimensionner depuis le coin supérieur gauche
-                    const newX = e.clientX - containerRect.left;
-                    const newY = e.clientY - containerRect.top;
-                    
-                    // Calculer la nouvelle taille
-                    const newWidth = cropX + cropWidth - newX;
-                    const newHeight = cropY + cropHeight - newY;
-                    
-                    // Appliquer avec limites minimales
-                    if (newWidth > 50) {
-                        cropX = Math.max(0, newX);
-                        cropWidth = newWidth;
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropY = Math.max(0, newY);
-                        cropHeight = newHeight;
-                    }
-                } else if (currentResizer.classList.contains('top-right')) {
-                    // Redimensionner depuis le coin supérieur droit
-                    const newY = e.clientY - containerRect.top;
-                    
-                    // Calculer la nouvelle taille
-                    const newWidth = e.clientX - containerRect.left - cropX;
-                    const newHeight = cropY + cropHeight - newY;
-                    
-                    // Appliquer avec limites minimales
-                    if (newWidth > 50) {
-                        cropWidth = Math.min(newWidth, containerRect.width - cropX);
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropY = Math.max(0, newY);
-                        cropHeight = newHeight;
-                    }
-                } else if (currentResizer.classList.contains('bottom-left')) {
-                    // Redimensionner depuis le coin inférieur gauche
-                    const newX = e.clientX - containerRect.left;
-                    
-                    // Calculer la nouvelle taille
-                    const newWidth = cropX + cropWidth - newX;
-                    const newHeight = e.clientY - containerRect.top - cropY;
-                    
-                    // Appliquer avec limites minimales
-                    if (newWidth > 50) {
-                        cropX = Math.max(0, newX);
-                        cropWidth = newWidth;
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropHeight = Math.min(newHeight, containerRect.height - cropY);
-                    }
-                } else if (currentResizer.classList.contains('bottom-right')) {
-                    // Redimensionner depuis le coin inférieur droit
-                    
-                    // Calculer la nouvelle taille
-                    const newWidth = e.clientX - containerRect.left - cropX;
-                    const newHeight = e.clientY - containerRect.top - cropY;
-                    
-                    // Appliquer avec limites minimales
-                    if (newWidth > 50) {
-                        cropWidth = Math.min(newWidth, containerRect.width - cropX);
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropHeight = Math.min(newHeight, containerRect.height - cropY);
-                    }
-                }
-                
-                updateCropArea();
-            }
-        });
-        
-        document.addEventListener('mouseup', () => {
-            isDragging = false;
-            isResizing = false;
-            currentResizer = null;
-        });
-        
-        // Gestion du tactile pour mobile
-        cropArea.addEventListener('touchstart', (e) => {
-            if (e.target === cropArea) {
-                isDragging = true;
-                const touch = e.touches[0];
-                dragStartX = touch.clientX - cropArea.getBoundingClientRect().left;
-                dragStartY = touch.clientY - cropArea.getBoundingClientRect().top;
-            }
-        });
-        
-        document.addEventListener('touchmove', (e) => {
-            if (isDragging) {
-                const touch = e.touches[0];
-                const containerRect = previewContainer.getBoundingClientRect();
-                let newX = touch.clientX - containerRect.left - dragStartX;
-                let newY = touch.clientY - containerRect.top - dragStartY;
-                
-                newX = Math.max(0, Math.min(newX, containerRect.width - cropWidth));
-                newY = Math.max(0, Math.min(newY, containerRect.height - cropHeight));
-                
-                cropX = newX;
-                cropY = newY;
-                updateCropArea();
-                e.preventDefault();
-            } else if (isResizing && currentResizer) {
-                const touch = e.touches[0];
-                const containerRect = previewContainer.getBoundingClientRect();
-                
-                if (currentResizer.classList.contains('top-left')) {
-                    const newX = touch.clientX - containerRect.left;
-                    const newY = touch.clientY - containerRect.top;
-                    
-                    const newWidth = cropX + cropWidth - newX;
-                    const newHeight = cropY + cropHeight - newY;
-                    
-                    if (newWidth > 50) {
-                        cropX = Math.max(0, newX);
-                        cropWidth = newWidth;
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropY = Math.max(0, newY);
-                        cropHeight = newHeight;
-                    }
-                } else if (currentResizer.classList.contains('top-right')) {
-                    const newY = touch.clientY - containerRect.top;
-                    
-                    const newWidth = touch.clientX - containerRect.left - cropX;
-                    const newHeight = cropY + cropHeight - newY;
-                    
-                    if (newWidth > 50) {
-                        cropWidth = Math.min(newWidth, containerRect.width - cropX);
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropY = Math.max(0, newY);
-                        cropHeight = newHeight;
-                    }
-                } else if (currentResizer.classList.contains('bottom-left')) {
-                    const newX = touch.clientX - containerRect.left;
-                    
-                    const newWidth = cropX + cropWidth - newX;
-                    const newHeight = touch.clientY - containerRect.top - cropY;
-                    
-                    if (newWidth > 50) {
-                        cropX = Math.max(0, newX);
-                        cropWidth = newWidth;
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropHeight = Math.min(newHeight, containerRect.height - cropY);
-                    }
-                } else if (currentResizer.classList.contains('bottom-right')) {
-                    const newWidth = touch.clientX - containerRect.left - cropX;
-                    const newHeight = touch.clientY - containerRect.top - cropY;
-                    
-                    if (newWidth > 50) {
-                        cropWidth = Math.min(newWidth, containerRect.width - cropX);
-                    }
-                    
-                    if (newHeight > 50) {
-                        cropHeight = Math.min(newHeight, containerRect.height - cropY);
-                    }
-                }
-                
-                updateCropArea();
-                e.preventDefault();
-            }
-        });
-        
-        document.addEventListener('touchend', () => {
-            isDragging = false;
-            isResizing = false;
-            currentResizer = null;
-        });
-        
-        // Fonction pour rogner l'image et faire l'OCR
-        cropButton.addEventListener('click', () => {
-            // Calculer le facteur d'échelle entre l'image affichée et l'image réelle
-            const scaleX = canvas.width / preview.offsetWidth;
-            const scaleY = canvas.height / preview.offsetHeight;
+        // Rogner l'image
+        cropBtn.addEventListener('click', () => {
+            if (!cropper) return;
             
-            // Calculer les coordonnées du rognage sur l'image réelle
-            const realCropX = cropX * scaleX;
-            const realCropY = cropY * scaleY;
-            const realCropWidth = cropWidth * scaleX;
-            const realCropHeight = cropHeight * scaleY;
+            // Obtenir l'image rognée
+            const croppedCanvas = cropper.getCroppedCanvas({
+                maxWidth: 1920,
+                maxHeight: 1080,
+                fillColor: '#fff'
+            });
             
-            // Rogner l'image
-            croppedCanvas.width = realCropWidth;
-            croppedCanvas.height = realCropHeight;
-            croppedCtx.drawImage(
-                canvas, 
-                realCropX, realCropY, realCropWidth, realCropHeight,
-                0, 0, realCropWidth, realCropHeight
-            );
-            
-            showStep(step3);
-            textOutput.textContent = "Analyse en cours...";
-            
-            // Effectuer l'OCR avec Tesseract
-            performLocalOCR();
-        });
-        
-        // Fonction OCR avec Tesseract.js
-        function performLocalOCR() {
-            const textSizeOption = textSizeSelect.value;
-            
-            let tesseractOptions = {};
-            
-            // Configurer Tesseract en fonction de la sensibilité choisie
-            if (textSizeOption === 'small') {
-                // Configuration pour les petites écritures
-                tesseractOptions = {
-                    tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789éèêëàâäôöùûüç.,;:\'"-_?!(){}[]<>%$€ ',
-                    tessjs_create_pdf: '0',
-                    tessjs_create_hocr: '0',
-                    tessjs_create_tsv: '0',
-                    tessjs_create_box: '0',
-                    tessjs_create_unlv: '0',
-                    tessjs_create_osd: '0',
-                    tessjs_textonly_pdf: '0',
-                    textord_min_linesize: 2.5
-                };
-            } else if (textSizeOption === 'large') {
-                // Configuration pour les grandes écritures uniquement
-                tesseractOptions = {
-                    tessedit_char_whitelist: 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789éèêëàâäôöùûüç.,;:\'"-_?!(){}[]<>%$€ ',
-                    tessjs_create_pdf: '0',
-                    tessjs_create_hocr: '0',
-                    tessjs_create_tsv: '0',
-                    tessjs_create_box: '0',
-                    tessjs_create_unlv: '0',
-                    tessjs_create_osd: '0',
-                    tessjs_textonly_pdf: '0',
-                    textord_min_linesize: 8.0
-                };
-            }
-            
-            Tesseract.recognize(croppedCanvas, 'fra', tesseractOptions)
-                .then(({ data: { text } }) => {
-                    if (text && text.trim()) {
-                        textOutput.textContent = text;
-                    } else {
-                        textOutput.textContent = "Aucun texte détecté. Essayez de recadrer l'image ou d'ajuster la sensibilité.";
-                    }
-                })
-                .catch(err => {
-                    console.error("Erreur Tesseract:", err);
-                    textOutput.textContent = "Échec du scan. Erreur: " + err.message;
+            if (croppedCanvas) {
+                // Convertir le canvas rogné en URL de données
+                const croppedImageDataURL = croppedCanvas.toDataURL('image/png');
+                
+                // Mettre à jour l'image affichée
+                cropper.destroy();
+                capturedImage.src = croppedImageDataURL;
+                
+                // Réinitialiser le cropper avec la nouvelle image
+                cropper = new Cropper(capturedImage, {
+                    viewMode: 1,
+                    dragMode: 'move',
+                    aspectRatio: NaN,
+                    autoCropArea: 0.8,
+                    restore: false,
+                    guides: true,
+                    center: true,
+                    highlight: true,
+                    cropBoxMovable: true,
+                    cropBoxResizable: true,
+                    toggleDragModeOnDblclick: true,
                 });
-        }
-        
-        // Commentaires de la partie API OCR Space externe
-        /*
-        // Fonction pour envoyer l'image à l'API OCR Space
-        function sendImageToExternalOCR(imageBase64) {
-            let formData = new FormData();
-            formData.append("apikey", OCR_API_KEY);
-            formData.append("base64Image", imageBase64);
-            formData.append("language", "fre");  // Français
-
-            return fetch(OCR_API_URL, {
-                method: "POST",
-                body: formData
-            })
-            .then(response => response.json())
-            .then(data => {
-                console.log("Réponse API:", data);
-                if (data.ParsedResults && data.ParsedResults.length > 0) {
-                    return data.ParsedResults[0].ParsedText;
-                } else {
-                    throw new Error("Aucun texte détecté par l'API.");
-                }
-            })
-            .catch(err => {
-                console.error("Erreur OCR API:", err);
-                throw err;
-            });
-        }
-        */
-        
-        // Bouton pour reprendre une photo
-        retakeButton.addEventListener('click', () => {
-            showStep(step1);
-        });
-        
-        // Bouton pour recommencer
-        restartButton.addEventListener('click', () => {
-            showStep(step1);
-        });
-        
-        // Bouton pour sauvegarder le texte
-        saveButton.addEventListener('click', () => {
-            const text = textOutput.textContent;
-            const filename = prompt("Entrez le nom du fichier:", "texte_scanné.txt");
-            
-            if (filename) {
-                const element = document.createElement('a');
-                element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(text));
-                element.setAttribute('download', filename);
-                
-                element.style.display = 'none';
-                document.body.appendChild(element);
-                
-                element.click();
-                
-                document.body.removeChild(element);
             }
+        });
+        
+        // Extraire le texte avec Tesseract
+        scanBtn.addEventListener('click', async () => {
+            if (!cropper) return;
+            
+            try {
+                // Obtenir l'image finale rognée
+                const finalCanvas = cropper.getCroppedCanvas({
+                    maxWidth: 1920,
+                    maxHeight: 1080,
+                    fillColor: '#fff'
+                });
+                
+                if (finalCanvas) {
+                    // Afficher le chargement
+                    loadingDiv.style.display = 'block';
+                    scanBtn.disabled = true;
+                    
+                    // Convertir le canvas en URL de données
+                    const finalImageDataURL = finalCanvas.toDataURL('image/png');
+                    
+                    // Utiliser Tesseract pour OCR
+                    const result = await Tesseract.recognize(
+                        finalImageDataURL,
+                        'fra', // Langue française
+                        {
+                            logger: m => console.log(m),
+                            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:\'"-+<>/*&^%$#@!()[]{}àâäæçéèêëîïôœùûüÿÀÂÄÆÇÉÈÊËÎÏÔŒÙÛÜŸ \n\t',
+                            tessedit_pageseg_mode: '6', // Mode segmentation supposant un bloc de texte uniforme
+                            tessjs_create_hocr: false,
+                            tessjs_create_tsv: false,
+                        }
+                    );
+                    
+                    // Stocker et afficher le texte extrait
+                    extractedText = result.data.text;
+                    resultText.textContent = extractedText;
+                    resultContainer.style.display = 'block';
+                    
+                    // Activer le bouton de sauvegarde
+                    saveBtn.disabled = false;
+                    
+                    // Masquer le chargement
+                    loadingDiv.style.display = 'none';
+                    
+                } else {
+                    alert('Impossible de traiter l\'image.');
+                }
+                
+            } catch (err) {
+                console.error('Erreur lors de l\'extraction du texte:', err);
+                alert('Erreur lors de l\'extraction du texte. Veuillez réessayer.');
+                loadingDiv.style.display = 'none';
+                scanBtn.disabled = false;
+            }
+        });
+        
+        // Sauvegarder le document
+        saveBtn.addEventListener('click', () => {
+            if (!extractedText) return;
+            
+            // Demander le nom du document
+            const docName = prompt('Nom du document:', 'Document_scanné');
+            
+            if (docName) {
+                // Créer un blob avec le texte
+                const blob = new Blob([extractedText], { type: 'text/plain' });
+                
+                // Créer un lien de téléchargement
+                const a = document.createElement('a');
+                const url = URL.createObjectURL(blob);
+                a.href = url;
+                a.download = `${docName}.txt`;
+                
+                // Déclencher le téléchargement
+                document.body.appendChild(a);
+                a.click();
+                
+                // Nettoyer
+                setTimeout(() => {
+                    document.body.removeChild(a);
+                    window.URL.revokeObjectURL(url);
+                }, 0);
+            }
+        });
+        
+        // Réinitialiser l'application
+        resetBtn.addEventListener('click', () => {
+            // Arrêter la vidéo si elle est en cours
+            if (stream) {
+                stream.getTracks().forEach(track => track.stop());
+                video.srcObject = null;
+            }
+            
+            // Détruire le cropper s'il existe
+            if (cropper) {
+                cropper.destroy();
+                cropper = null;
+            }
+            
+            // Réinitialiser l'interface
+            video.style.display = 'none';
+            imgContainer.style.display = 'none';
+            resultContainer.style.display = 'none';
+            loadingDiv.style.display = 'none';
+            
+            // Réinitialiser les boutons
+            startCameraBtn.disabled = false;
+            takePhotoBtn.disabled = true;
+            cropBtn.disabled = true;
+            scanBtn.disabled = true;
+            saveBtn.disabled = true;
+            
+            // Effacer le texte extrait
+            extractedText = '';
+            resultText.textContent = '';
         });
     </script>
 </body>
