@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="fr">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>OCR avec caméra et API</title>
+  <script src="https://cdn.jsdelivr.net/npm/tesseract.js@2.1.1/dist/tesseract.min.js"></script> <!-- Inclure Tesseract.js -->
+  <style>
+    /* Style global */
+    body {
+      font-family: Arial, sans-serif;
+      margin: 0;
+      padding: 0;
+      background-color: #f4f4f4;
+      text-align: center;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+
+    /* Conteneur principal */
+    .container {
+      width: 100%;
+      max-width: 600px;
+      padding: 20px;
+      background-color: white;
+      border-radius: 8px;
+      box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+    }
+
+    /* Vidéo de la caméra */
+    video {
+      width: 100%;
+      height: auto;
+      border: 1px solid #ccc;
+      border-radius: 8px;
+    }
+
+    /* Bouton capture */
+    #capture {
+      padding: 12px 24px;
+      font-size: 16px;
+      margin-top: 20px;
+      background-color: #4CAF50;
+      color: white;
+      border: none;
+      border-radius: 5px;
+      cursor: pointer;
+      transition: background-color 0.3s;
+    }
+
+    #capture:hover {
+      background-color: #45a049;
+    }
+
+    /* Zone de texte pour les résultats */
+    #textOutput {
+      margin-top: 20px;
+      font-size: 18px;
+      color: #333;
+      word-wrap: break-word;
+      white-space: pre-wrap;
+    }
+
+    /* Canvas caché pour traitement */
+    canvas {
+      display: none;
+    }
+
+    /* Pour les écrans très petits */
+    @media (max-width: 600px) {
+      #capture {
+        width: 100%;
+        font-size: 18px;
+      }
+    }
+  </style>
+</head>
+<body>
+
+  <!-- Conteneur principal -->
+  <div class="container">
+    <h1>Détection de texte avec la caméra</h1>
+
+    <!-- Affichage vidéo de la caméra -->
+    <video id="video" autoplay></video>
+
+    <!-- Bouton pour capturer l'image -->
+    <button id="capture">Capturer l'image</button>
+
+    <!-- Zone pour afficher le texte OCR extrait -->
+    <div id="textOutput">Aucun texte détecté pour l'instant.</div>
+
+    <!-- Canvas caché pour traiter l'image capturée -->
+    <canvas id="canvas"></canvas>
+  </div>
+
+  <script>
+    // Récupération des éléments HTML
+    const video = document.getElementById('video');
+    const canvas = document.getElementById('canvas');
+    const ctx = canvas.getContext('2d');
+    const captureButton = document.getElementById('capture');
+    const textOutput = document.getElementById('textOutput');
+
+    // Remplacer par ta clé API valide et l'URL de ton API OCR
+    const OCR_API_KEY = 'K89517877488957'; // Remplace avec ta clé API OCR
+    const OCR_API_URL = 'https://api.ocr.space/parse/image';
+
+    // Activation de la webcam
+    navigator.mediaDevices.getUserMedia({ video: true })
+      .then(stream => {
+        video.srcObject = stream;
+      })
+      .catch(err => {
+        console.error("Erreur d'accès à la caméra:", err);
+        textOutput.textContent = "Erreur d'accès à la caméra.";
+      });
+
+    // Fonction pour redimensionner l'image avant l'envoi à l'API
+    function resizeImage(imageData) {
+      const maxWidth = 800;
+      const maxHeight = 800;
+      let img = new Image();
+      img.src = imageData;
+      img.onload = function() {
+        let canvasResized = document.createElement('canvas');
+        let ctxResized = canvasResized.getContext('2d');
+        const ratio = Math.min(maxWidth / img.width, maxHeight / img.height);
+        canvasResized.width = img.width * ratio;
+        canvasResized.height = img.height * ratio;
+        ctxResized.drawImage(img, 0, 0, canvasResized.width, canvasResized.height);
+        const resizedImage = canvasResized.toDataURL();
+        sendImageToExternalOCR(resizedImage);
+      };
+    }
+
+    // Fonction qui envoie l'image encodée en Base64 à l'API OCR externe
+    function sendImageToExternalOCR(imageBase64) {
+      textOutput.textContent = "Extraction en cours...";
+
+      fetch(OCR_API_URL, {
+        method: 'POST',
+        headers: {
+          'apikey': OCR_API_KEY,
+          'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({ base64Image: imageBase64 })
+      })
+      .then(response => response.json())
+      .then(data => {
+        console.log("Réponse API:", data);
+        if (data.OCRExitCode === 1 && data.ParsedResults) {
+          let extractedText = data.ParsedResults[0].ParsedText;
+          textOutput.textContent = extractedText ? "Texte détecté : " + extractedText : "Aucun texte détecté.";
+        } else {
+          throw new Error("Aucun texte détecté par l'API.");
+        }
+      })
+      .catch(err => {
+        console.error("Erreur OCR API:", err);
+        textOutput.textContent = "Erreur lors de l'extraction du texte. Tentative de traitement avec Tesseract.js.";
+        performLocalOCR();  // Fallback vers Tesseract.js si l'API échoue
+      });
+    }
+
+    // Fonction fallback : utilisation de Tesseract.js pour l'OCR local
+    function performLocalOCR() {
+      textOutput.textContent = "Extraction locale en cours...";
+      Tesseract.recognize(
+        canvas,
+        'eng', // Langue : anglais ici, tu peux changer en fonction de ton besoin
+        {
+          logger: (m) => {
+            console.log(m); // Affiche les logs pour le traitement
+          }
+        }
+      ).then(({ data: { text } }) => {
+        if (text) {
+          textOutput.textContent = "Texte extrait par Tesseract.js : " + text;
+        } else {
+          textOutput.textContent = "Aucun texte détecté localement.";
+        }
+      }).catch((err) => {
+        console.error("Erreur Tesseract:", err);
+        textOutput.textContent = "Erreur lors de l'extraction du texte localement.";
+      });
+    }
+
+    // Capture de l'image et extraction du texte
+    captureButton.addEventListener('click', () => {
+      canvas.width = video.videoWidth;
+      canvas.height = video.videoHeight;
+      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+      
+      let imageData = canvas.toDataURL('image/png'); // Convertir l'image en base64
+      resizeImage(imageData); // Redimensionner l'image et envoyer à l'API OCR
+    });
+  </script>
+</body>
+</html>
