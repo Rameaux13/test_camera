@@ -373,7 +373,6 @@
                     // Créer FormData pour l'envoi
                     const formData = new FormData();
                     formData.append('apikey', apiKey);
-                    formData.append('language', languageSelect.value);
                     formData.append('OCREngine', '2'); // Engine 2 est meilleur pour les petits textes
                     formData.append('scale', 'true'); // Améliore la détection des petits textes
                     formData.append('detectOrientation', 'true');
