@@ -3,8 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Scanner de Document</title>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/tesseract.js/4.1.1/tesseract.min.js"></script>
+    <title>Scanner de Document avec OCR.space</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.js"></script>
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/cropperjs/1.5.13/cropper.min.css">
     <style>
@@ -123,9 +122,36 @@
             display: none;
         }
         
+        .spinner {
+            border: 4px solid #f3f3f3;
+            border-top: 4px solid #4CAF50;
+            border-radius: 50%;
+            width: 30px;
+            height: 30px;
+            animation: spin 1s linear infinite;
+            margin: 0 auto;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
         .loading p {
             margin-top: 10px;
             color: #666;
+        }
+        
+        .lang-select {
+            margin-bottom: 15px;
+            text-align: center;
+        }
+        
+        #language-select {
+            padding: 8px;
+            border-radius: 4px;
+            border: 1px solid #ddd;
+            font-size: 14px;
         }
         
         @media (max-width: 768px) {
@@ -151,6 +177,7 @@
             <div class="img-container">
                 <img id="captured-image" alt="Image capturée">
             </div>
+            </div>
             
             <div class="button-group">
                 <button id="start-camera">Activer la caméra</button>
@@ -163,6 +190,7 @@
         </div>
         
         <div class="loading">
+            <div class="spinner"></div>
             <p>Extraction du texte en cours...</p>
         </div>
         
@@ -173,6 +201,9 @@
     </div>
 
     <script>
+        // Clé d'API OCR.space
+        const apiKey = "K89517877488957";
+        
         // Éléments DOM
         const video = document.getElementById('video');
         const canvas = document.getElementById('canvas');
@@ -181,6 +212,7 @@
         const resultContainer = document.getElementById('result-container');
         const resultText = document.getElementById('result-text');
         const loadingDiv = document.querySelector('.loading');
+        const languageSelect = document.getElementById('language-select');
         
         // Boutons
         const startCameraBtn = document.getElementById('start-camera');
@@ -302,7 +334,22 @@
             }
         });
         
-        // Extraire le texte avec Tesseract
+        // Fonction pour convertir Data URL en Blob
+        function dataURLtoBlob(dataURL) {
+            const parts = dataURL.split(';base64,');
+            const contentType = parts[0].split(':')[1];
+            const raw = window.atob(parts[1]);
+            const rawLength = raw.length;
+            const uInt8Array = new Uint8Array(rawLength);
+            
+            for (let i = 0; i < rawLength; ++i) {
+                uInt8Array[i] = raw.charCodeAt(i);
+            }
+            
+            return new Blob([uInt8Array], { type: contentType });
+        }
+        
+        // Extraire le texte avec OCR.space API
         scanBtn.addEventListener('click', async () => {
             if (!cropper) return;
             
@@ -319,32 +366,42 @@
                     loadingDiv.style.display = 'block';
                     scanBtn.disabled = true;
                     
-                    // Convertir le canvas en URL de données
+                    // Convertir le canvas en URL de données puis en Blob
                     const finalImageDataURL = finalCanvas.toDataURL('image/png');
+                    const blob = dataURLtoBlob(finalImageDataURL);
                     
-                    // Utiliser Tesseract pour OCR
-                    const result = await Tesseract.recognize(
-                        finalImageDataURL,
-                        'fra', // Langue française
-                        {
-                            logger: m => console.log(m),
-                            tessedit_char_whitelist: 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789.,;:\'"-+<>/*&^%$#@!()[]{}àâäæçéèêëîïôœùûüÿÀÂÄÆÇÉÈÊËÎÏÔŒÙÛÜŸ \n\t',
-                            tessedit_pageseg_mode: '6', // Mode segmentation supposant un bloc de texte uniforme
-                            tessjs_create_hocr: false,
-                            tessjs_create_tsv: false,
-                        }
-                    );
+                    // Créer FormData pour l'envoi
+                    const formData = new FormData();
+                    formData.append('apikey', apiKey);
+                    formData.append('language', languageSelect.value);
+                    formData.append('OCREngine', '2'); // Engine 2 est meilleur pour les petits textes
+                    formData.append('scale', 'true'); // Améliore la détection des petits textes
+                    formData.append('detectOrientation', 'true');
+                    formData.append('isTable', 'false');
+                    formData.append('file', blob, 'image.png');
                     
-                    // Stocker et afficher le texte extrait
-                    extractedText = result.data.text;
-                    resultText.textContent = extractedText;
-                    resultContainer.style.display = 'block';
+                    // Appeler l'API OCR.space
+                    const response = await fetch('https://api.ocr.space/parse/image', {
+                        method: 'POST',
+                        body: formData
+                    });
                     
-                    // Activer le bouton de sauvegarde
-                    saveBtn.disabled = false;
+                    const data = await response.json();
+                    
+                    if (data.OCRExitCode === 1) {
+                        // Succès
+                        extractedText = data.ParsedResults.map(result => result.ParsedText).join('\n');
+                        resultText.textContent = extractedText;
+                        resultContainer.style.display = 'block';
+                        saveBtn.disabled = false;
+                    } else {
+                        // Erreur
+                        alert(`Erreur d'OCR: ${data.ErrorMessage || 'Impossible d\'extraire le texte'}`);
+                    }
                     
                     // Masquer le chargement
                     loadingDiv.style.display = 'none';
+                    scanBtn.disabled = false;
                     
                 } else {
                     alert('Impossible de traiter l\'image.');
@@ -420,4 +477,3 @@
         });
     </script>
 </body>
-</html>
